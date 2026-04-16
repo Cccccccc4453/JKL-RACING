@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JKLRACING | Live Hub</title>
+    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@900&family=Oswald:wght@400;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        :root { --yellow: #ffcc00; --dark: #000; --glass: rgba(255, 255, 255, 0.05); }
+        body { margin: 0; font-family: 'Oswald', sans-serif; background: var(--dark); color: #fff; overflow-x: hidden; }
+        
+        /* Compact Navigation */
+        nav { display: flex; justify-content: space-between; align-items: center; padding: 0 5%; background: #000; border-bottom: 2px solid var(--yellow); height: 60px; position: sticky; top: 0; z-index: 1000; }
+        .logo-img { height: 45px; cursor: pointer; }
+        .nav-links span { margin-left: 12px; cursor: pointer; font-size: 0.7rem; font-weight: bold; text-transform: uppercase; color: #888; transition: 0.3s; }
+        .nav-links span:hover { color: var(--yellow); }
+
+        /* The Hero - Fixed Small Display */
+        .hero { text-align: center; padding: 40px 10px; min-height: 180px; display: flex; flex-direction: column; justify-content: center; }
+        .main-clock { font-size: clamp(2.5rem, 16vw, 9rem); font-weight: 900; color: var(--yellow); font-family: 'Kanit'; letter-spacing: -4px; line-height: 0.9; margin: 5px 0; }
+        #h-loc { color: var(--yellow); text-transform: uppercase; font-size: 1.2rem; margin: 0; opacity: 0.8; letter-spacing: 1px; }
+        
+        /* Views */
+        .view { display: none; padding: 20px 5%; animation: fadeIn 0.3s ease; }
+        .view.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        
+        .card { background: #111; padding: 15px; border-radius: 8px; border: 1px solid #222; margin-bottom: 15px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th { text-align: left; color: var(--yellow); padding: 8px; border-bottom: 1px solid #333; font-size: 0.8rem; }
+        td { padding: 10px; border-bottom: 1px solid #1a1a1a; font-size: 0.9rem; }
+        
+        /* Inputs & Buttons */
+        input, select, textarea { background: #0a0a0a; border: 1px solid #333; color: white; padding: 12px; width: 100%; box-sizing: border-box; margin: 5px 0; border-radius: 4px; font-family: inherit; }
+        .btn { background: var(--yellow); color: #000; border: none; padding: 14px; font-weight: 900; cursor: pointer; width: 100%; border-radius: 4px; text-transform: uppercase; }
+        .btn-danger { background: #ff3e3e; color: white; padding: 4px 8px; border-radius: 3px; font-size: 0.7rem; border: none; cursor: pointer; }
+
+        #login-gate { position: fixed; inset: 0; background: rgba(0,0,0,0.95); z-index: 10000; display: none; flex-direction: column; justify-content: center; align-items: center; }
+    </style>
+</head>
+<body>
+
+    <div id="login-gate">
+        <div class="card" style="width: 280px; text-align: center;">
+            <h3 style="color:var(--yellow)">ADMIN LOGIN</h3>
+            <input type="password" id="pass-input" placeholder="Password">
+            <button onclick="checkAuth()" class="btn">UNLOCK</button>
+        </div>
+    </div>
+
+    <nav>
+        <img id="nav-logo" class="logo-img" onclick="showView('home')" alt="JKL Racing">
+        <div class="nav-links">
+            <span onclick="showView('home')">Home</span>
+            <span onclick="showView('schedule')">Schedule</span>
+            <span onclick="showView('points')">Points</span>
+            <span onclick="showView('nominations')">Noms</span>
+            <span onclick="showView('admin')" style="color:var(--yellow)">Admin</span>
+        </div>
+    </nav>
+
+    <section id="home" class="view active">
+        <div class="hero">
+            <div style="font-size: 0.7rem; letter-spacing: 4px; color: #444; font-weight: 700; text-transform: uppercase;">Next Event Start</div>
+            <div class="main-clock" id="main-clock">00:00:00:00</div>
+            <h2 id="h-loc">LOADING...</h2>
+        </div>
+    </section>
+
+    <section id="schedule" class="view">
+        <h2 style="color:var(--yellow)">RACE CALENDAR</h2>
+        <div id="sched-list"></div>
+    </section>
+    
+    <section id="points" class="view">
+        <h2 style="color:var(--yellow)">CHAMPIONSHIP STANDINGS</h2>
+        <div class="card">
+            <table><thead><tr><th>POS</th><th>DRIVER</th><th>PTS</th></tr></thead><tbody id="points-table"></tbody></table>
+        </div>
+    </section>
+
+    <section id="nominations" class="view">
+        <h2 style="color:var(--yellow)">DRIVER NOMINATIONS</h2>
+        <div class="card">
+            <h3>Submit Nomination</h3>
+            <select id="nom-track-select"><option value="">Select Track</option></select>
+            <input type="text" id="nom-driver" placeholder="Driver Name">
+            <textarea id="nom-reason" placeholder="Why should they win?"></textarea>
+            <button class="btn" onclick="submitNom()">SUBMIT NOMINATION</button>
+        </div>
+        <div id="public-feed"></div>
+    </section>
+
+    <section id="admin" class="view">
+        <h2 style="color:var(--yellow)">COMMAND CENTER</h2>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 15px;">
+            <div class="card">
+                <h3>Add Race</h3>
+                <input type="text" id="add-track" placeholder="Track Name">
+                <input type="datetime-local" id="add-date">
+                <button class="btn" onclick="addRace()">SAVE RACE</button>
+                <div id="admin-race-list" style="margin-top:15px;"></div>
+            </div>
+            <div class="card">
+                <h3>Standings</h3>
+                <input type="text" id="d-name" placeholder="Driver">
+                <input type="number" id="d-pts" placeholder="Points">
+                <button class="btn" onclick="updatePoints()">SAVE POINTS</button>
+                <div id="admin-driver-list" style="margin-top:15px;"></div>
+            </div>
+            <div class="card">
+                <h3>Inbox</h3>
+                <div id="admin-inbox"></div>
+            </div>
+        </div>
+    </section>
+
+    <script>
+        const SUPABASE_URL = "https://cacwhcuupqgbdhumcogs.supabase.co"; 
+        const SUPABASE_KEY = "sb_publishable_9NWeiWZZ68zklRE3-Q5Q1g_-HAf0MZT";
+        const ADMIN_PASS = "Walter";
+        const LOGO_URL = "https://cacwhcuupqgbdhumcogs.supabase.co/storage/v1/object/public/logos/JKL_Racing_1_2.png";
+        
+        document.getElementById('nav-logo').src = LOGO_URL;
+        const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        let targetDate = null, isAuth = false;
+
+        async function fetchData() {
+            try {
+                const { data: races } = await _supabase.from('races').select('*').order('race_date', { ascending: true });
+                if(races && races.length > 0) {
+                    const nextRace = races.find(r => new Date(r.race_date) > new Date()) || races[0];
+                    targetDate = new Date(nextRace.race_date).getTime();
+                    document.getElementById('h-loc').innerText = nextRace.track;
+                    document.getElementById('sched-list').innerHTML = races.map(r => `<div class="card"><strong>${r.track}</strong><br><small>${new Date(r.race_date).toLocaleString()}</small></div>`).join('');
+                    document.getElementById('admin-race-list').innerHTML = races.map(r => `<div style="padding:5px 0;">${r.track} <button class="btn-danger" onclick="deleteItem('races','${r.id}')">X</button></div>`).join('');
+                    document.getElementById('nom-track-select').innerHTML = races.map(r => `<option value="${r.track}">${r.track}</option>`).join('');
+                }
+
+                const { data: pts } = await _supabase.from('standings').select('*').order('points', {ascending:false});
+                if(pts) {
+                    document.getElementById('points-table').innerHTML = pts.map((p,i) => `<tr><td>${i+1}</td><td>${p.driver_name}</td><td>${p.points}</td></tr>`).join('');
+                    document.getElementById('admin-driver-list').innerHTML = pts.map(p => `<div style="padding:5px 0;">${p.driver_name} <button class="btn-danger" onclick="deleteItem('standings','${p.id}')">X</button></div>`).join('');
+                }
+
+                const { data: noms } = await _supabase.from('nominations').select('*').order('created_at', {ascending:false});
+                if(noms) {
+                    document.getElementById('public-feed').innerHTML = noms.map(n => `<div class="card" style="font-size:0.8rem;"><strong>${n.driver_name}</strong> - ${n.track}</div>`).join('');
+                    document.getElementById('admin-inbox').innerHTML = noms.map(n => `<div style="font-size:0.8rem; border-bottom:1px solid #222; padding:5px;">${n.driver_name}: ${n.reason} <button class="btn-danger" onclick="deleteItem('nominations','${n.id}')">X</button></div>`).join('');
+                }
+            } catch(e) { console.log("Refresh required..."); }
+        }
+
+        // Logic for Timer Fix
+        setInterval(() => {
+            if(!targetDate) return;
+            const now = new Date().getTime();
+            const diff = targetDate - now;
+            const clock = document.getElementById('main-clock');
+
+            if (diff <= 0) {
+                clock.innerText = "00:00:00:00";
+                return;
+            }
+
+            const d = Math.floor(diff / (1000 * 60 * 60 * 24));
+            const h = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+            const m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+            const s = Math.floor((diff % (1000 * 60)) / 1000);
+
+            const pad = (n) => String(n).padStart(2, '0');
+            clock.innerText = `${pad(d)}:${pad(h)}:${pad(m)}:${pad(s)}`;
+        }, 1000);
+
+        function showView(id) {
+            if(id === 'admin' && !isAuth) { document.getElementById('login-gate').style.display='flex'; return; }
+            document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+            document.getElementById('login-gate').style.display='none';
+            fetchData();
+        }
+
+        function checkAuth() {
+            if(document.getElementById('pass-input').value === ADMIN_PASS) { isAuth = true; showView('admin'); }
+            else alert("Invalid Key");
+        }
+
+        async function addRace() { await _supabase.from('races').insert([{ track: document.getElementById('add-track').value, race_date: document.getElementById('add-date').value }]); fetchData(); }
+        async function updatePoints() { await _supabase.from('standings').upsert({ driver_name: document.getElementById('d-name').value, points: document.getElementById('d-pts').value }, { onConflict: 'driver_name' }); fetchData(); }
+        async function submitNom() { await _supabase.from('nominations').insert([{ driver_name: document.getElementById('nom-driver').value, track: document.getElementById('nom-track-select').value, reason: document.getElementById('nom-reason').value }]); alert("Sent!"); fetchData(); }
+        async function deleteItem(t, id) { if(confirm("Confirm Delete?")) { await _supabase.from(t).delete().eq('id', id); fetchData(); } }
+
+        fetchData();
+    </script>
+</body>
+</html>
